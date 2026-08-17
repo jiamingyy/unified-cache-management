@@ -18,7 +18,6 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
     KVConnectorBase_V1,
     KVConnectorMetadata,
     KVConnectorRole,
-    SupportsHMA,
 )
 
 try:
@@ -27,6 +26,14 @@ try:
     )
 except ImportError:
     KVConnectorWorkerMetadata = object
+
+try:
+    from vllm.distributed.kv_transfer.kv_connector.v1.base import SupportsHMA
+except ImportError:
+    # vLLM < 0.17 (e.g. 0.11.0) has no HMA support; no-op placeholder so the
+    # connector still imports. HMA hooks are never invoked on old vLLM.
+    class SupportsHMA:  # type: ignore[no-redef]
+        pass
 
 from vllm.distributed.parallel_state import get_world_group
 from vllm.model_executor.models.utils import extract_layer_index
@@ -322,7 +329,18 @@ class KVCacheLayout:
             name: extract_layer_index(name) for name in kvcaches.keys()
         }
         self.first_layer_id = next(iter(self.layer_name_to_id.values()))
-        self.num_blocks = self.kv_cache_config.num_blocks
+        if kv_cache_config is not None:
+            self.num_blocks = self.kv_cache_config.num_blocks
+        else:
+            # vLLM < 0.17 does not pass kv_cache_config to connectors; infer
+            # the block count from the first kv cache tensor.
+            sample = next(iter(kvcaches.values()))
+            if isinstance(sample, Tuple):
+                sample = sample[0]
+            if sample.dim() == 5 and sample.shape[0] == 2:
+                self.num_blocks = sample.shape[1]
+            else:
+                self.num_blocks = sample.shape[0]
         self._build_layout(kvcaches)
 
     def _collect_tensor_rows(self, kvcaches):
@@ -1048,11 +1066,19 @@ class UCMDirectConnector(KVConnectorBase_V1):
         role: KVConnectorRole,
         kv_cache_config: Optional["KVCacheConfig"] = None,
     ):
-        super().__init__(
-            vllm_config=vllm_config,
-            role=role,
-            kv_cache_config=kv_cache_config,
-        )
+        try:
+            super().__init__(
+                vllm_config=vllm_config,
+                role=role,
+                kv_cache_config=kv_cache_config,
+            )
+        except TypeError:
+            # vLLM < 0.17: KVConnectorBase_V1.__init__ does not accept
+            # kv_cache_config yet.
+            super().__init__(
+                vllm_config=vllm_config,
+                role=role,
+            )
         self.use_layerwise = False
         self.kv_caches: dict[str, torch.Tensor] = {}
         self.local_rank = (
@@ -2782,11 +2808,18 @@ class UCMConnector(KVConnectorBase_V1, SupportsHMA):
         role: KVConnectorRole,
         kv_cache_config: Optional["KVCacheConfig"] = None,
     ):
-        super().__init__(
-            vllm_config=vllm_config,
-            role=role,
-            kv_cache_config=kv_cache_config,
-        )
+        try:
+            super().__init__(
+                vllm_config=vllm_config,
+                role=role,
+                kv_cache_config=kv_cache_config,
+            )
+        except TypeError:
+            # vLLM < 0.17: KVConnectorBase_V1.__init__ has no kv_cache_config.
+            super().__init__(
+                vllm_config=vllm_config,
+                role=role,
+            )
         self.connector: KVConnectorBase_V1
         ucm_config = Config(vllm_config.kv_transfer_config)
         self.engine_id = vllm_config.kv_transfer_config.engine_id.rsplit("_dp", 1)[0]

@@ -1,0 +1,15 @@
+{
+  "lastChangelogVersion": "0.84.2",
+  "theme": "dark",
+  "defaultProvider": "zai-coding-cn",
+  "defaultModel": "glm-5.3",
+  "defaultThinkingLevel": "medium",
+  "packages": [
+    "npm:pi-web-access",
+    "npm:pi-subagents",
+    "npm:@narumitw/pi-plan-mode",
+    "npm:@narumitw/pi-lsp",
+    "npm:pi-powerline"
+  ],
+  "footer": true
+}

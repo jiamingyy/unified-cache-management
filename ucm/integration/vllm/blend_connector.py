@@ -384,8 +384,9 @@ class UCMBlendConnector(UCMDirectConnector):
             f"first chunk prefix hit: {pc_hit_blocks}, "
             f"chunks cache total hit: {chunk_hit_blocks}, "
         )
-        self.monitor.update_stats(
-            "ConnStats",
+        from ucm.shared.metrics import ucmmetrics
+
+        ucmmetrics.update_stats(
             {"interval_lookup_hit_rates": chunk_hit_blocks / max_blk_num},
         )
 
@@ -481,11 +482,10 @@ class UCMBlendConnector(UCMDirectConnector):
                 positions.extend(
                     [chunk_meta.position_offset] * len(chunk_meta.hits_vllm_blk_ids)
                 )
-        if all_hits_vllm_ids:
-            self.delta_rope_vllm_ids = torch.tensor(
-                all_hits_vllm_ids, device=self.device
-            )
-            self.delta_rope_positions = torch.tensor(positions, device=self.device)
+        if all_hits_vllm_ids and self.kv_caches:
+            device = next(iter(self.kv_caches.values())).device
+            self.delta_rope_vllm_ids = torch.tensor(all_hits_vllm_ids, device=device)
+            self.delta_rope_positions = torch.tensor(positions, device=device)
 
     def clear_connector_metadata(self) -> None:
         """Clear the post process meta"""

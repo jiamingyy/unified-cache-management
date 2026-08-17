@@ -10,8 +10,14 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
     KVConnectorBase_V1,
     KVConnectorMetadata,
     KVConnectorRole,
-    SupportsHMA,
 )
+
+try:
+    from vllm.distributed.kv_transfer.kv_connector.v1.base import SupportsHMA
+except ImportError:
+    # vLLM < 0.17 has no HMA support; no-op placeholder.
+    class SupportsHMA:  # type: ignore[no-redef]
+        pass
 
 try:
     from vllm.distributed.kv_transfer.kv_connector.v1.base import (

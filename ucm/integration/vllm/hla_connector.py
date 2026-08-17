@@ -12,8 +12,14 @@ from vllm.config import VllmConfig
 from vllm.distributed.kv_transfer.kv_connector.v1.base import (
     KVConnectorMetadata,
     KVConnectorRole,
-    SupportsHMA,
 )
+
+try:
+    from vllm.distributed.kv_transfer.kv_connector.v1.base import SupportsHMA
+except ImportError:
+    # vLLM < 0.17 has no HMA support; no-op placeholder.
+    class SupportsHMA:  # type: ignore[no-redef]
+        pass
 from vllm.platforms import current_platform
 from vllm.v1.core.sched.output import SchedulerOutput
 from vllm.v1.kv_cache_interface import (

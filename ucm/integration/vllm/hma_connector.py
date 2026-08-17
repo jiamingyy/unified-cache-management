@@ -11,8 +11,14 @@ import torch
 from vllm.distributed.kv_transfer.kv_connector.v1.base import (
     KVConnectorMetadata,
     KVConnectorRole,
-    SupportsHMA,
 )
+
+try:
+    from vllm.distributed.kv_transfer.kv_connector.v1.base import SupportsHMA
+except ImportError:
+    # vLLM < 0.17 has no HMA support; no-op placeholder.
+    class SupportsHMA:  # type: ignore[no-redef]
+        pass
 from vllm.model_executor.models.utils import extract_layer_index
 from vllm.v1.core.sched.output import SchedulerOutput
 
